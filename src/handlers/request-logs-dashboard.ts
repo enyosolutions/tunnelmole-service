@@ -88,6 +88,7 @@ const renderEntry = (log: RequestLog, token?: string): string => {
     const headersSection = htmlEscape(formatJson(log.requestHeaders));
     const responseHeadersSection = htmlEscape(formatJson(log.responseHeaders));
     const tokenInput = token ? `<input type="hidden" name="token" value="${htmlEscape(token)}" />` : '';
+    const detailsId = typeof log.id !== 'undefined' ? `log-details-${log.id}` : `log-details-${nanoid(8)}`;
 
     const replayButton = typeof log.id !== 'undefined'
         ? `
@@ -95,10 +96,14 @@ const renderEntry = (log: RequestLog, token?: string): string => {
                 <input type="hidden" name="action" value="replay" />
                 <input type="hidden" name="logId" value="${log.id}" />
                 ${tokenInput}
-                <button type="submit">Replay Request</button>
+                <button type="submit" class="btn">Replay</button>
             </form>
         `
         : '';
+
+    const detailsButton = `
+        <button type="button" class="btn toggle-details" data-target="${detailsId}">Details</button>
+    `;
 
     return `
         <article class="log-entry">
@@ -107,12 +112,12 @@ const renderEntry = (log: RequestLog, token?: string): string => {
                 <span class="path">${htmlEscape(log.path)}</span>
                 <span class="status ${log.responseStatus && log.responseStatus >= 400 ? 'status-error' : ''}">${log.responseStatus ?? '—'}</span>
                 <span class="timestamp">${htmlEscape(createdAt)}</span>
+                <div class="actions">
+                    ${detailsButton}
+                    ${replayButton}
+                </div>
             </header>
-            <div class="actions">
-                ${replayButton}
-            </div>
-            <details>
-                <summary>Toggle details</summary>
+            <section id="${detailsId}" class="details-panel" hidden>
                 <section>
                     <h4>Request Headers</h4>
                     <pre>${headersSection}</pre>
@@ -123,7 +128,7 @@ const renderEntry = (log: RequestLog, token?: string): string => {
                     <pre>${responseHeadersSection}</pre>
                 </section>
                 ${renderBodySection('Response Body', log.responseBody)}
-            </details>
+            </section>
         </article>
     `;
 };
@@ -162,14 +167,41 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 summary { cursor: pointer; }
                 details > summary { font-weight: 600; }
                 form.toolbar { margin: 1rem 0; }
-                form.inline-form { display: inline-block; }
-                button { background: #238636; border: 1px solid #2ea043; color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; }
-                button:hover { background: #2ea043; }
-                .actions { margin: 0.5rem 0; }
+                form.inline-form { display: inline-block; margin-left: 0.5rem; }
+                .btn { background: #238636; border: 1px solid #2ea043; color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+                .btn:hover { background: #2ea043; }
+                .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+                .details-panel { margin-top: 0.75rem; }
                 .flash { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
                 .flash-success { background: #1f6feb33; border: 1px solid #1f6feb; }
                 .flash-error { background: #f8514933; border: 1px solid #f85149; }
             </style>
+            <script>
+                document.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (!(target instanceof HTMLElement)) {
+                        return;
+                    }
+                    if (target.classList.contains('toggle-details')) {
+                        const panelId = target.getAttribute('data-target');
+                        if (!panelId) {
+                            return;
+                        }
+                        const panel = document.getElementById(panelId);
+                        if (!panel) {
+                            return;
+                        }
+                        const isHidden = panel.hasAttribute('hidden');
+                        if (isHidden) {
+                            panel.removeAttribute('hidden');
+                            target.textContent = 'Hide';
+                        } else {
+                            panel.setAttribute('hidden', 'true');
+                            target.textContent = 'Details';
+                        }
+                    }
+                });
+            </script>
         </head>
         <body>
             <h1>Request Logs</h1>
@@ -179,7 +211,7 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
             <form method="post" class="toolbar">
                 <input type="hidden" name="action" value="prune" />
                 ${tokenInput}
-                <button type="submit">Prune All Logs For This Host</button>
+                <button type="submit" class="btn">Prune All Logs For This Host</button>
             </form>
             ${entries}
         </body>
