@@ -80,9 +80,9 @@ const findRecentRequestLogsByHostname = async (hostname: string, limit = 50): Pr
         FROM ${REQUEST_LOGS_TABLE}
         WHERE hostname = ?
         ORDER BY created_at DESC, id DESC
-        LIMIT ?
+        LIMIT ${safeLimit}
         `,
-        [hostname, safeLimit]
+        [hostname]
     );
 
     return rows.map(mapRowToRequestLog);
