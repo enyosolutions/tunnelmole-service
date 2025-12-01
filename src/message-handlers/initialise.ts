@@ -17,6 +17,7 @@ import DomainAlreadyReserved from '../messages/domain-already-reserved';
 import TooManyDomains from '../messages/domain-reservation-error';
 import DomainReservationError from '../messages/domain-reservation-error';
 import { authorize } from '../authentication/authorize';
+import { getRequestLogPassword, upsertRequestLogPassword } from '../repository/request-log-credentials-repository';
 const randomstring = require("randomstring");
 
 const RANDOM_SUBDOMAIN_LENGTH = 6;
@@ -89,7 +90,8 @@ export default async function initialise(message: InitialiseMessage, websocket: 
         // Make this service look like its working, when in fact its not
         const fakeHostnameAssignedMessage: HostnameAssignedMessage = {
             type: 'hostnameAssigned',
-            hostname
+            hostname,
+            logsPassword: 'unavailable'
         }
 
         websocket.sendMessage(fakeHostnameAssignedMessage);
@@ -108,6 +110,11 @@ export default async function initialise(message: InitialiseMessage, websocket: 
     // If there is an existing connection for this hostname and the client id matches the one passed by the client, replace the websocket with the new one
     // if there is an existing connection for this hostname but the client id does not match, send back a hostnameAlreadyTaken message
     const existingConnection = proxy.findConnectionByHostname(hostname);
+    let logsPassword = await getRequestLogPassword(hostname);
+    if (typeof logsPassword !== 'string' || logsPassword.length === 0) {
+        logsPassword = randomstring.generate(32);
+    }
+
     if (typeof existingConnection == 'undefined') {
         await addClientLog(clientId, "initialized", hostname);
         proxy.addConnection(hostname, websocket, clientId, message.apiKey, websocket.ipAddress);
@@ -122,9 +129,12 @@ export default async function initialise(message: InitialiseMessage, websocket: 
         websocket.sendMessage(hostnameAlreadyTaken);
     }
 
+    await upsertRequestLogPassword(hostname, logsPassword);
+
     const hostnameAssignedMessage : HostnameAssignedMessage = {
         type: 'hostnameAssigned',
-        hostname
+        hostname,
+        logsPassword
     }
 
     websocket.sendMessage(hostnameAssignedMessage);

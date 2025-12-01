@@ -22,3 +22,25 @@ CREATE TABLE IF NOT EXISTS `client_log` (
   `date` datetime DEFAULT NULL,
   PRIMARY KEY (`id`)
 );
+
+CREATE TABLE IF NOT EXISTS `request_logs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `hostname` varchar(255) NOT NULL,
+  `path` text,
+  `method` varchar(25) DEFAULT NULL,
+  `request_headers` longtext,
+  `request_body` longtext,
+  `response_status` int DEFAULT NULL,
+  `response_headers` longtext,
+  `response_body` longtext,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `hostname_created_at` (`hostname`, `created_at`)
+);
+
+CREATE TABLE IF NOT EXISTS `request_log_credentials` (
+  `hostname` varchar(255) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`hostname`)
+);

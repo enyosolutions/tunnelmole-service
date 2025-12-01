@@ -2,6 +2,7 @@
 import tunnelmoleConnections from './src/handlers/tunnelmole-connections';
 import handleRequest from './src/handlers/handle-request';
 import logTelemetry from './src/handlers/log-telemetry';
+import requestLogsDashboard from './src/handlers/request-logs-dashboard';
 
 import express from 'express';
 import bodyParser from 'body-parser';
@@ -19,6 +20,8 @@ app.use(bodyParser.raw(options));
 app.get("/tunnelmole-connections", tunnelmoleConnections);
 app.post("/tunnelmole-log-telemetry", logTelemetry);
 app.delete("/tunnelmole/unreserve-subdomain", unreserveSubdomain);
+app.get("/__logs", requestLogsDashboard);
+app.post("/__logs", requestLogsDashboard);
 
 /**
  * Handle incoming HTTP(s) requests for existing connections

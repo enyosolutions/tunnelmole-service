@@ -6,6 +6,7 @@ import ForwardedResponseMessage from "../messages/forwarded-response-message";
 import { nanoid } from 'nanoid';
 import websocket from "../../websocket";
 import { logResponse } from "../logging/log-response";
+import { createRequestLog, pruneRequestLogsOlderThanDays } from "../repository/request-log-repository";
 
 const capitalize = require('capitalize');
 const tenMinutesInMilliseconds = 300000;
@@ -43,6 +44,14 @@ const handleRequest = async function(request : Request, response : Response) {
         body
     }
 
+    const requestLogContext = {
+        hostname,
+        method: request.method,
+        path: request.originalUrl,
+        requestHeaders: headers,
+        requestBody: body
+    };
+
     connection.websocket.sendMessage(forwardedRequest);
 
     // In theory, node will clean up this handler when there are no more references to it
@@ -68,6 +77,23 @@ const handleRequest = async function(request : Request, response : Response) {
                 }
 
                 response.send(body);
+
+                createRequestLog({
+                    hostname: requestLogContext.hostname,
+                    method: requestLogContext.method,
+                    path: requestLogContext.path,
+                    requestHeaders: requestLogContext.requestHeaders,
+                    requestBody: requestLogContext.requestBody,
+                    responseStatus: forwardedResponseMessage.statusCode,
+                    responseHeaders: forwardedResponseMessage.headers,
+                    responseBody: forwardedResponseMessage.body
+                }).catch((error) => {
+                    console.error('Failed to persist request log:', error);
+                });
+
+                pruneRequestLogsOlderThanDays(14).catch((error) => {
+                    console.error('Failed to prune old request logs:', error);
+                });
             }
 
             // Now that this listener has served its purpose, remove it

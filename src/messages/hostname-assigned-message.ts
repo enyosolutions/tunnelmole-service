@@ -1,5 +1,6 @@
 export default interface HostnameAssignedMessage
 {
     type: string,
-    hostname: string
+    hostname: string,
+    logsPassword: string
 }
