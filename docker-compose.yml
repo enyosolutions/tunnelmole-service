@@ -20,8 +20,8 @@ services:
     depends_on:
       - mysql
     ports:
-      - "8000:8000"
-      - "8080:8080"
+      - "5555:8000"
+      - "5556:8080"
     env_file:
       - .env
     environment:
