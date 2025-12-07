@@ -58,7 +58,7 @@ const renderBodySection = (title: string, base64Body: string): string => {
     return `
         <section>
             <h4>${title}</h4>
-            <pre>${readableBody}</pre>
+            <pre style="white-space: pre-wrap;">${readableBody}</pre>
             <details>
                 <summary>Raw (base64)</summary>
                 <pre>${htmlEscape(base64Body)}</pre>
@@ -84,7 +84,7 @@ const renderFlash = (flash?: FlashMessage): string => {
 };
 
 const renderEntry = (log: RequestLog, token?: string): string => {
-    const createdAt = log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Unknown time';
+    const createdAt = log.createdAt ? new Date(log.createdAt).toLocaleString('de-DE') : 'Unknown time';
     const headersSection = htmlEscape(formatJson(log.requestHeaders));
     const responseHeadersSection = htmlEscape(formatJson(log.responseHeaders));
     const tokenInput = token ? `<input type="hidden" name="token" value="${htmlEscape(token)}" />` : '';
@@ -106,7 +106,7 @@ const renderEntry = (log: RequestLog, token?: string): string => {
     `;
 
     return `
-        <article class="log-entry">
+        <article class="log-entry toggle-details" data-target="${detailsId}">
             <header>
                 <span class="method">${htmlEscape(log.method)}</span>
                 <span class="path">${htmlEscape(log.path)}</span>
@@ -179,6 +179,8 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
             <script>
                 document.addEventListener('click', (event) => {
                     const target = event.target;
+                    event.preventDefault();
+                    event.stopPropagation();
                     if (!(target instanceof HTMLElement)) {
                         return;
                     }
