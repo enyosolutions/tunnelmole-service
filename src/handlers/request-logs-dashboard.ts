@@ -84,7 +84,7 @@ const renderFlash = (flash?: FlashMessage): string => {
 };
 
 const renderEntry = (log: RequestLog, token?: string): string => {
-    const createdAt = log.createdAt ? new Date(log.createdAt).toLocaleString('de-DE') : 'Unknown time';
+    const createdAt = log.createdAt ? new Date(log.createdAt).toLocaleString('fr-FR') : 'Unknown time';
     const headersSection = htmlEscape(formatJson(log.requestHeaders));
     const responseHeadersSection = htmlEscape(formatJson(log.responseHeaders));
     const tokenInput = token ? `<input type="hidden" name="token" value="${htmlEscape(token)}" />` : '';
@@ -106,7 +106,7 @@ const renderEntry = (log: RequestLog, token?: string): string => {
     `;
 
     return `
-        <article class="log-entry toggle-details" data-target="${detailsId}">
+        <article class="log-entry" data-target="${detailsId}">
             <header>
                 <span class="method">${htmlEscape(log.method)}</span>
                 <span class="path">${htmlEscape(log.path)}</span>
@@ -177,31 +177,53 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 .flash-error { background: #f8514933; border: 1px solid #f85149; }
             </style>
             <script>
-                document.addEventListener('click', (event) => {
-                    const target = event.target;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (!(target instanceof HTMLElement)) {
+                const toggleLogDetails = (logEntry) => {
+                    const panelId = logEntry.getAttribute('data-target');
+                    if (!panelId) {
                         return;
                     }
-                    if (target.classList.contains('toggle-details')) {
-                        const panelId = target.getAttribute('data-target');
-                        if (!panelId) {
-                            return;
-                        }
-                        const panel = document.getElementById(panelId);
-                        if (!panel) {
-                            return;
-                        }
-                        const isHidden = panel.hasAttribute('hidden');
-                        if (isHidden) {
-                            panel.removeAttribute('hidden');
-                            target.textContent = 'Hide';
-                        } else {
-                            panel.setAttribute('hidden', 'true');
-                            target.textContent = 'Details';
-                        }
+                    const panel = document.getElementById(panelId);
+                    if (!panel) {
+                        return;
                     }
+                    const isHidden = panel.hasAttribute('hidden');
+                    if (isHidden) {
+                        panel.removeAttribute('hidden');
+                    } else {
+                        panel.setAttribute('hidden', 'true');
+                    }
+                    const button = logEntry.querySelector('button.toggle-details');
+                    if (button) {
+                        button.textContent = isHidden ? 'Hide' : 'Details';
+                    }
+                };
+
+                document.addEventListener('click', (event) => {
+                    const rawTarget = event.target;
+                    if (!(rawTarget instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const logEntry = rawTarget.closest('.log-entry');
+                    if (!logEntry) {
+                        return;
+                    }
+
+                    const header = logEntry.querySelector('header');
+                    const clickedInHeader = Boolean(header && header.contains(rawTarget));
+                    const toggleButton = rawTarget.closest('button.toggle-details');
+
+                    if (!clickedInHeader && !toggleButton) {
+                        return;
+                    }
+
+                    const interactiveTarget = rawTarget.closest('button, a, input, select, textarea, summary, form');
+                    if (interactiveTarget && !interactiveTarget.classList.contains('toggle-details')) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    toggleLogDetails(logEntry);
                 });
             </script>
         </head>
