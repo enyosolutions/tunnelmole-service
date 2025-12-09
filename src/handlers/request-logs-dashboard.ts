@@ -88,12 +88,39 @@ interface RenderedLogEntry {
     detail: string;
 }
 
+const methodClassName = (method: string): string => {
+    const normalized = method.toLowerCase();
+    if (normalized === 'get') {
+        return 'method-get';
+    }
+    if (normalized === 'post') {
+        return 'method-post';
+    }
+    if (normalized === 'put') {
+        return 'method-put';
+    }
+    if (normalized === 'patch') {
+        return 'method-patch';
+    }
+    if (normalized === 'delete') {
+        return 'method-delete';
+    }
+    if (normalized === 'options') {
+        return 'method-options';
+    }
+    if (normalized === 'head') {
+        return 'method-head';
+    }
+    return 'method-default';
+};
+
 const renderEntry = (log: RequestLog, token?: string): RenderedLogEntry => {
     const createdAt = log.createdAt ? new Date(log.createdAt).toLocaleString('fr-FR') : 'Unknown time';
     const headersSection = htmlEscape(formatJson(log.requestHeaders));
     const responseHeadersSection = htmlEscape(formatJson(log.responseHeaders));
     const tokenInput = token ? `<input type="hidden" name="token" value="${htmlEscape(token)}" />` : '';
     const detailsId = typeof log.id !== 'undefined' ? `log-details-${log.id}` : `log-details-${nanoid(8)}`;
+    const methodClasses = `method ${methodClassName(log.method ?? '')}`;
 
     const replayButton = typeof log.id !== 'undefined'
         ? `
@@ -108,7 +135,7 @@ const renderEntry = (log: RequestLog, token?: string): RenderedLogEntry => {
 
     const summary = `
         <li class="log-summary" data-details-id="${detailsId}">
-            <span class="method">${htmlEscape(log.method)}</span>
+            <span class="${methodClasses}">${htmlEscape(log.method)}</span>
             <span class="path">${htmlEscape(log.path)}</span>
             <span class="status ${log.responseStatus && log.responseStatus >= 400 ? 'status-error' : ''}">${log.responseStatus ?? '—'}</span>
             <span class="timestamp">${htmlEscape(createdAt)}</span>
@@ -119,7 +146,7 @@ const renderEntry = (log: RequestLog, token?: string): RenderedLogEntry => {
         <article id="${detailsId}" class="log-detail" hidden>
             <header>
                 <div>
-                    <h2>${htmlEscape(log.method)} <span class="path">${htmlEscape(log.path)}</span></h2>
+                    <h2><span class="${methodClasses}">${htmlEscape(log.method)}</span> <span class="path">${htmlEscape(log.path)}</span></h2>
                     <p class="timestamp">${htmlEscape(createdAt)}</p>
                 </div>
                 <div class="actions">
@@ -190,7 +217,15 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 .log-detail-panel { margin-top: 0; margin-bottom: 0; background: #1f2937; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; min-height: 400px; }
                 .log-detail header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
                 .log-detail h2 { margin: 0; }
-                .method { font-weight: 600; }
+                .method { font-weight: 600; margin-right: 0.25rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; display: inline-block; background: #374151; color: #e6edf3; }
+                .method-get { background: #22c55e; color: #052e16; }
+                .method-post { background: #3b82f6; color: #0f172a; }
+                .method-put { background: #f59e0b; color: #451a03; }
+                .method-patch { background: #a855f7; color: #2e1065; }
+                .method-delete { background: #ef4444; color: #450a0a; }
+                .method-options { background: #0ea5e9; color: #022c41; }
+                .method-head { background: #94a3b8; color: #111827; }
+                .method-default { background: #4b5563; color: #e6edf3; }
                 .path { font-family: monospace; }
                 .status { font-weight: 600; }
                 .status-error { color: #f85149; }
