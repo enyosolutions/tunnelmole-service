@@ -217,13 +217,13 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 .log-detail-panel { margin-top: 0; margin-bottom: 0; background: #1f2937; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; min-height: 400px; }
                 .log-detail header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
                 .log-detail h2 { margin: 0; }
-                .method { font-weight: 600; margin-right: 0.25rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; display: inline-block; background: #374151; color: #e6edf3; }
-                .method-get { background: #22c55e; color: #052e16; }
-                .method-post { background: #3b82f6; color: #0f172a; }
-                .method-put { background: #f59e0b; color: #451a03; }
-                .method-patch { background: #a855f7; color: #2e1065; }
-                .method-delete { background: #ef4444; color: #450a0a; }
-                .method-options { background: #0ea5e9; color: #022c41; }
+                .method { font-weight: 600; margin-right: 0.25rem; padding: 0.5rem 0.5rem; border-radius: 5px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; display: inline-block; background: #374151; color: #e6edf3; }
+                .method-get { background: #22c55e; color: #fff; }
+                .method-post { background: #3b82f6; color: #ffffff; }
+                .method-put { background: #f59e0b; color: #ffffff; }
+                .method-patch { background: #a855f7; color: #ffffff; }
+                .method-delete { background: #ef4444; color: #ffffff; }
+                .method-options { background:rgb(14, 29, 233); color: #ffffff; }
                 .method-head { background: #94a3b8; color: #111827; }
                 .method-default { background: #4b5563; color: #e6edf3; }
                 .path { font-family: monospace; }
