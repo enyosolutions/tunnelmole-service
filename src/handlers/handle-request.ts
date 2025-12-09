@@ -62,6 +62,7 @@ const handleRequest = async function(request : Request, response : Response) {
             logResponse(forwardedResponseMessage, hostname); // Log if debug logging is enabled
             const body = Buffer.from(forwardedResponseMessage.body, 'base64');
             forwardedResponseMessage.headers['x-forwarded-for'] = connection.websocket.ipAddress;
+            const sanitizedHeaders = sanitizeForwardedResponseHeaders(forwardedResponseMessage.headers, body.length);
 
             // Bail if this handler is not for the request that created it
             if (forwardedResponseMessage.requestId !== requestId) {
@@ -71,8 +72,8 @@ const handleRequest = async function(request : Request, response : Response) {
             if (forwardedResponseMessage.type === 'forwardedResponse') {
                 response.status(forwardedResponseMessage.statusCode);
 
-                for (const name in forwardedResponseMessage.headers) {
-                    const value = forwardedResponseMessage.headers[name];
+                for (const name in sanitizedHeaders) {
+                    const value = sanitizedHeaders[name];
                     response.header(capitalize.words(name), value);
                 }
 
@@ -85,7 +86,7 @@ const handleRequest = async function(request : Request, response : Response) {
                     requestHeaders: requestLogContext.requestHeaders,
                     requestBody: requestLogContext.requestBody,
                     responseStatus: forwardedResponseMessage.statusCode,
-                    responseHeaders: forwardedResponseMessage.headers,
+                    responseHeaders: sanitizedHeaders,
                     responseBody: forwardedResponseMessage.body
                 }).catch((error) => {
                     console.error('Failed to persist request log:', error);
@@ -117,6 +118,34 @@ const handleRequest = async function(request : Request, response : Response) {
     }, tenMinutesInMilliseconds);
 
     return;
+}
+
+const sanitizeForwardedResponseHeaders = (headers: Record<string, any>, bodyLength: number): Record<string, any> => {
+    const sanitized: Record<string, any> = {};
+    const forbiddenHeaders = ['transfer-encoding', 'content-length'];
+
+    if (headers && typeof headers === 'object') {
+        for (const name in headers) {
+            if (!Object.prototype.hasOwnProperty.call(headers, name)) {
+                continue;
+            }
+            const value = headers[name];
+
+            if (typeof value === 'undefined') {
+                continue;
+            }
+
+            if (forbiddenHeaders.includes(name.toLowerCase())) {
+                continue;
+            }
+
+            sanitized[name] = value;
+        }
+    }
+
+    sanitized['content-length'] = bodyLength.toString();
+
+    return sanitized;
 }
 
 export default handleRequest;
