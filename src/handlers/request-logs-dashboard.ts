@@ -151,10 +151,10 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
             <meta charset="utf-8" />
             <title>Request Logs for ${htmlEscape(hostname)}</title>
             <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #0d1117; color: #e6edf3; margin: 0; padding: 2rem; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #111827; color: #e6edf3; margin: 0; padding: 2rem; }
                 h1 { margin-top: 0; }
                 .muted { color: #8b949e; }
-                .log-entry { background: #161b22; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 1rem; padding: 1rem; }
+                .log-entry { background: #1f2937; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 1rem; padding: 1rem; }
                 .log-entry header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
                 .method { font-weight: 600; }
                 .path { flex: 1; font-family: monospace; }
@@ -162,7 +162,7 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 .status-error { color: #f85149; }
                 .timestamp { font-size: 0.9rem; color: #8b949e; }
                 details { margin-top: 0.5rem; }
-                pre { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 0.75rem; overflow-x: auto; }
+                pre { background: #161d28; border: 1px solid #30363d; border-radius: 6px; padding: 0.75rem; overflow-x: auto; }
                 section { margin: 0.5rem 0; }
                 summary { cursor: pointer; }
                 details > summary { font-weight: 600; }
