@@ -10,6 +10,9 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
       - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./src/sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
 
   tunnelmole-service:
     build:
@@ -28,3 +31,6 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
     volumes:
       - ./config-instance.toml:/app/config-instance.toml:ro
+
+volumes:
+  mysql_data:
