@@ -167,10 +167,6 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
 
     const flashMarkup = renderFlash(flash);
     const tokenInput = token ? `<input type="hidden" name="token" value="${htmlEscape(token)}" />` : '';
-    const helperMessage = token
-        ? `<p class="muted">Bookmark this page with <code>?token=${htmlEscape(token)}</code> to skip typing the password again.</p>`
-        : '';
-
     return `
         <!doctype html>
         <html lang="en">
@@ -179,7 +175,9 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
             <title>Request Logs for ${htmlEscape(hostname)}</title>
             <style>
                 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #111827; color: #e6edf3; margin: 0; padding: 2rem; }
-                h1 { margin-top: 0; }
+                h1 { margin-top: 0; font-size: 1.5rem; }
+                .page-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+                .page-header .toolbar { margin-left: auto; }
                 .muted { color: #8b949e; }
                 .logs-layout { display: grid; grid-template-columns: 320px 1fr; gap: 1rem; }
                 .logs-sidebar { background: #1b2432; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
@@ -199,7 +197,7 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 .timestamp { font-size: 0.9rem; color: #8b949e; margin: 0; }
                 pre { background: #161d28; border: 1px solid #30363d; border-radius: 6px; padding: 0.75rem; overflow-x: auto; }
                 section { margin: 0.5rem 0; }
-                form.toolbar { margin: 1rem 0; }
+                form.toolbar { margin: 0; }
                 form.inline-form { display: inline-block; }
                 .btn { background: #238636; border: 1px solid #2ea043; color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
                 .btn:hover { background: #2ea043; }
@@ -330,15 +328,15 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
             </script>
         </head>
         <body>
-            <h1>Request Logs</h1>
-            <p class="muted">Hostname: ${htmlEscape(hostname)} &middot; Bodies are decoded as UTF-8 and raw base64 copies are available.</p>
+            <div class="page-header">
+                <h1>Request Logs for ${htmlEscape(hostname)}</h1>
+                <form method="post" class="toolbar">
+                    <input type="hidden" name="action" value="prune" />
+                    ${tokenInput}
+                    <button type="submit" class="btn">Prune All Logs For This Host</button>
+                </form>
+            </div>
             ${flashMarkup}
-            ${helperMessage}
-            <form method="post" class="toolbar">
-                <input type="hidden" name="action" value="prune" />
-                ${tokenInput}
-                <button type="submit" class="btn">Prune All Logs For This Host</button>
-            </form>
             <div id="log-entries">
                 ${entries}
             </div>
