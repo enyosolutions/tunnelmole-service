@@ -1,4 +1,4 @@
-version: '3.8'
+name: tmole
 
 services:
   mysql:
@@ -8,8 +8,8 @@ services:
       - .env
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    ports:
-      - "3306:3306"
+#    ports:
+#      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./src/sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
