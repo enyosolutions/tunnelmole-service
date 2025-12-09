@@ -187,7 +187,7 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 .log-summary .path { font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .log-summary .timestamp { font-size: 0.8rem; color: #8b949e; grid-column: 1 / -1; }
                 .log-summary.active { background: #2d3748; }
-                .log-detail-panel { background: #1f2937; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; min-height: 400px; }
+                .log-detail-panel { margin-top: 0; margin-bottom: 0; background: #1f2937; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; min-height: 400px; }
                 .log-detail header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
                 .log-detail h2 { margin: 0; }
                 .method { font-weight: 600; }
