@@ -83,7 +83,12 @@ const renderFlash = (flash?: FlashMessage): string => {
     return '';
 };
 
-const renderEntry = (log: RequestLog, token?: string): string => {
+interface RenderedLogEntry {
+    summary: string;
+    detail: string;
+}
+
+const renderEntry = (log: RequestLog, token?: string): RenderedLogEntry => {
     const createdAt = log.createdAt ? new Date(log.createdAt).toLocaleString('fr-FR') : 'Unknown time';
     const headersSection = htmlEscape(formatJson(log.requestHeaders));
     const responseHeadersSection = htmlEscape(formatJson(log.responseHeaders));
@@ -101,41 +106,63 @@ const renderEntry = (log: RequestLog, token?: string): string => {
         `
         : '';
 
-    const detailsButton = `
-        <button type="button" class="btn toggle-details" data-target="${detailsId}">Details</button>
+    const summary = `
+        <li class="log-summary" data-details-id="${detailsId}">
+            <span class="method">${htmlEscape(log.method)}</span>
+            <span class="path">${htmlEscape(log.path)}</span>
+            <span class="status ${log.responseStatus && log.responseStatus >= 400 ? 'status-error' : ''}">${log.responseStatus ?? '—'}</span>
+            <span class="timestamp">${htmlEscape(createdAt)}</span>
+        </li>
     `;
 
-    return `
-        <article class="log-entry" data-target="${detailsId}">
+    const detail = `
+        <article id="${detailsId}" class="log-detail" hidden>
             <header>
-                <span class="method">${htmlEscape(log.method)}</span>
-                <span class="path">${htmlEscape(log.path)}</span>
-                <span class="status ${log.responseStatus && log.responseStatus >= 400 ? 'status-error' : ''}">${log.responseStatus ?? '—'}</span>
-                <span class="timestamp">${htmlEscape(createdAt)}</span>
+                <div>
+                    <h2>${htmlEscape(log.method)} <span class="path">${htmlEscape(log.path)}</span></h2>
+                    <p class="timestamp">${htmlEscape(createdAt)}</p>
+                </div>
                 <div class="actions">
-                    ${detailsButton}
+                    <span class="status ${log.responseStatus && log.responseStatus >= 400 ? 'status-error' : ''}">${log.responseStatus ?? '—'}</span>
                     ${replayButton}
                 </div>
             </header>
-            <section id="${detailsId}" class="details-panel" hidden>
-                <section>
-                    <h4>Request Headers</h4>
-                    <pre>${headersSection}</pre>
-                </section>
-                ${renderBodySection('Request Body', log.requestBody)}
-                <section>
-                    <h4>Response Headers</h4>
-                    <pre>${responseHeadersSection}</pre>
-                </section>
-                ${renderBodySection('Response Body', log.responseBody)}
+            <section>
+                <h4>Request Headers</h4>
+                <pre>${headersSection}</pre>
             </section>
+            ${renderBodySection('Request Body', log.requestBody)}
+            <section>
+                <h4>Response Headers</h4>
+                <pre>${responseHeadersSection}</pre>
+            </section>
+            ${renderBodySection('Response Body', log.responseBody)}
         </article>
     `;
+
+    return { summary, detail };
 };
 
 const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, token?: string): string => {
+    const renderedEntries = logs.map((log) => renderEntry(log, token));
+    const summaries = renderedEntries.map((entry) => entry.summary).join('\n');
+    const detailPanels = renderedEntries.map((entry) => entry.detail).join('\n');
+
     const entries = logs.length > 0
-        ? logs.map((log) => renderEntry(log, token)).join('\n')
+        ? `
+            <div class="logs-layout" data-has-logs="true">
+                <aside class="logs-sidebar">
+                    <ul id="log-summaries">
+                        ${summaries}
+                    </ul>
+                </aside>
+                <section class="log-detail-panel">
+                    <div id="log-detail-container">
+                        ${detailPanels}
+                    </div>
+                </section>
+            </div>
+        `
         : '<p class="muted">No requests logged for this endpoint yet.</p>';
 
     const flashMarkup = renderFlash(flash);
@@ -154,48 +181,133 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #111827; color: #e6edf3; margin: 0; padding: 2rem; }
                 h1 { margin-top: 0; }
                 .muted { color: #8b949e; }
-                .log-entry { background: #1f2937; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 1rem; padding: 1rem; }
-                .log-entry header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+                .logs-layout { display: grid; grid-template-columns: 320px 1fr; gap: 1rem; }
+                .logs-sidebar { background: #1b2432; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+                #log-summaries { list-style: none; margin: 0; padding: 0; }
+                .log-summary { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #30363d; align-items: baseline; }
+                .log-summary:last-child { border-bottom: none; }
+                .log-summary .path { font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .log-summary .timestamp { font-size: 0.8rem; color: #8b949e; grid-column: 1 / -1; }
+                .log-summary.active { background: #2d3748; }
+                .log-detail-panel { background: #1f2937; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; min-height: 400px; }
+                .log-detail header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+                .log-detail h2 { margin: 0; }
                 .method { font-weight: 600; }
-                .path { flex: 1; font-family: monospace; }
+                .path { font-family: monospace; }
                 .status { font-weight: 600; }
                 .status-error { color: #f85149; }
-                .timestamp { font-size: 0.9rem; color: #8b949e; }
-                details { margin-top: 0.5rem; }
+                .timestamp { font-size: 0.9rem; color: #8b949e; margin: 0; }
                 pre { background: #161d28; border: 1px solid #30363d; border-radius: 6px; padding: 0.75rem; overflow-x: auto; }
                 section { margin: 0.5rem 0; }
-                summary { cursor: pointer; }
-                details > summary { font-weight: 600; }
                 form.toolbar { margin: 1rem 0; }
-                form.inline-form { display: inline-block; margin-left: 0.5rem; }
+                form.inline-form { display: inline-block; }
                 .btn { background: #238636; border: 1px solid #2ea043; color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
                 .btn:hover { background: #2ea043; }
                 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-                .details-panel { margin-top: 0.75rem; }
                 .flash { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
                 .flash-success { background: #1f6feb33; border: 1px solid #1f6feb; }
                 .flash-error { background: #f8514933; border: 1px solid #f85149; }
             </style>
             <script>
-                const toggleLogDetails = (logEntry) => {
-                    const panelId = logEntry.getAttribute('data-target');
-                    if (!panelId) {
+                const LOG_CONTAINER_ID = 'log-entries';
+                const POLL_INTERVAL_MS = 5000;
+                let isRefreshingLogs = false;
+
+                const activateLogDetails = (detailsId) => {
+                    if (!detailsId) {
+                        return false;
+                    }
+
+                    let activated = false;
+                    const detailPanels = document.querySelectorAll('.log-detail');
+                    detailPanels.forEach((panel) => {
+                        if (panel.id === detailsId) {
+                            panel.removeAttribute('hidden');
+                            activated = true;
+                        } else {
+                            panel.setAttribute('hidden', 'true');
+                        }
+                    });
+
+                    const summaries = document.querySelectorAll('.log-summary');
+                    summaries.forEach((summary) => {
+                        const summaryDetailsId = summary.getAttribute('data-details-id');
+                        summary.classList.toggle('active', summaryDetailsId === detailsId);
+                    });
+
+                    return activated;
+                };
+
+                const activateFirstLog = () => {
+                    const firstSummary = document.querySelector('.log-summary');
+                    if (!firstSummary) {
+                        const detailPanels = document.querySelectorAll('.log-detail');
+                        detailPanels.forEach((panel) => panel.setAttribute('hidden', 'true'));
                         return;
                     }
-                    const panel = document.getElementById(panelId);
-                    if (!panel) {
+                    const detailsId = firstSummary.getAttribute('data-details-id');
+                    if (detailsId) {
+                        activateLogDetails(detailsId);
+                    }
+                };
+
+                const getActiveDetailsId = () => {
+                    const activeSummary = document.querySelector('.log-summary.active');
+                    return activeSummary ? activeSummary.getAttribute('data-details-id') : undefined;
+                };
+
+                const restoreActiveDetails = (detailsId) => {
+                    if (!detailsId) {
+                        activateFirstLog();
                         return;
                     }
-                    const isHidden = panel.hasAttribute('hidden');
-                    if (isHidden) {
-                        panel.removeAttribute('hidden');
-                    } else {
-                        panel.setAttribute('hidden', 'true');
+                    if (!activateLogDetails(detailsId)) {
+                        activateFirstLog();
                     }
-                    const button = logEntry.querySelector('button.toggle-details');
-                    if (button) {
-                        button.textContent = isHidden ? 'Hide' : 'Details';
+                };
+
+                const refreshLogs = async () => {
+                    if (isRefreshingLogs || document.hidden) {
+                        return;
                     }
+                    const container = document.getElementById(LOG_CONTAINER_ID);
+                    if (!container) {
+                        return;
+                    }
+
+                    const activeDetailsId = getActiveDetailsId();
+                    isRefreshingLogs = true;
+
+                    try {
+                        const response = await fetch(window.location.href, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            cache: 'no-cache'
+                        });
+                        if (!response.ok) {
+                            return;
+                        }
+                        const text = await response.text();
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(text, 'text/html');
+                        const updatedContainer = doc.getElementById(LOG_CONTAINER_ID);
+                        if (!updatedContainer) {
+                            return;
+                        }
+                        if (container.innerHTML === updatedContainer.innerHTML) {
+                            return;
+                        }
+                        container.innerHTML = updatedContainer.innerHTML;
+                        restoreActiveDetails(activeDetailsId);
+                    } catch (error) {
+                        console.error('Failed to refresh request logs:', error);
+                    } finally {
+                        isRefreshingLogs = false;
+                    }
+                };
+
+                const startLogPolling = () => {
+                    activateFirstLog();
+                    setInterval(refreshLogs, POLL_INTERVAL_MS);
                 };
 
                 document.addEventListener('click', (event) => {
@@ -204,27 +316,17 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                         return;
                     }
 
-                    const logEntry = rawTarget.closest('.log-entry');
-                    if (!logEntry) {
-                        return;
-                    }
-
-                    const header = logEntry.querySelector('header');
-                    const clickedInHeader = Boolean(header && header.contains(rawTarget));
-                    const toggleButton = rawTarget.closest('button.toggle-details');
-
-                    if (!clickedInHeader && !toggleButton) {
-                        return;
-                    }
-
-                    const interactiveTarget = rawTarget.closest('button, a, input, select, textarea, summary, form');
-                    if (interactiveTarget && !interactiveTarget.classList.contains('toggle-details')) {
+                    const summary = rawTarget.closest('.log-summary');
+                    if (!summary) {
                         return;
                     }
 
                     event.preventDefault();
-                    toggleLogDetails(logEntry);
+                    const detailsId = summary.getAttribute('data-details-id');
+                    activateLogDetails(detailsId);
                 });
+
+                document.addEventListener('DOMContentLoaded', startLogPolling);
             </script>
         </head>
         <body>
@@ -237,7 +339,9 @@ const renderPage = (hostname: string, logs: RequestLog[], flash?: FlashMessage, 
                 ${tokenInput}
                 <button type="submit" class="btn">Prune All Logs For This Host</button>
             </form>
-            ${entries}
+            <div id="log-entries">
+                ${entries}
+            </div>
         </body>
         </html>
     `;
