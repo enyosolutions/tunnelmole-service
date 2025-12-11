@@ -42,7 +42,9 @@ export default function websocket(websocket: HostipWebSocket, request: IncomingM
             // Skip any messages that are handled dynamically using other explicitly defined 'message' callbacks
             // Example: forwardedResponse handler in handleRequest that is set dynamically for every request
             const dynamicallyHandledMessageTypes = [
-                'forwardedResponse'
+                'forwardedResponse',
+                'forwardedResponseStreamStart',
+                'forwardedResponseStreamChunk'
             ];
 
             if (inArray(message.type, dynamicallyHandledMessageTypes)) {

@@ -3,13 +3,16 @@ import Proxy from "../proxy";
 import Connection from "../connection";
 import ForwardedRequestMessage from "../messages/forwarded-request-message";
 import ForwardedResponseMessage from "../messages/forwarded-response-message";
+import ForwardedResponseStreamStartMessage from "../messages/forwarded-response-stream-start-message";
+import ForwardedResponseStreamChunkMessage from "../messages/forwarded-response-stream-chunk-message";
+import CancelForwardedRequestMessage from "../messages/cancel-forwarded-request-message";
 import { nanoid } from 'nanoid';
-import websocket from "../../websocket";
 import { logResponse } from "../logging/log-response";
 import { createRequestLog, pruneRequestLogsOlderThanDays } from "../repository/request-log-repository";
 
 const capitalize = require('capitalize');
 const tenMinutesInMilliseconds = 300000;
+const STREAMED_RESPONSE_BODY_PLACEHOLDER = Buffer.from('[streamed response: body streamed directly to client]').toString('base64');
 
 const handleRequest = async function(request : Request, response : Response) {
     const proxy = Proxy.getInstance();
@@ -31,8 +34,10 @@ const handleRequest = async function(request : Request, response : Response) {
         headers[name] = value;
     }
 
-    // Get the request body, wether binary or text as a base64 string for trouble-free transmission over the WebSocket connection
-    // Unless its just an empty object, then set it to an empty string
+    const shouldStream = shouldStreamResponse(request);
+
+    // Get the request body, whether binary or text as a base64 string for trouble-free transmission over the WebSocket connection
+    // Unless it's just an empty object, then set it to an empty string
     const body = JSON.stringify(request.body) === JSON.stringify({}) ? '' : request.body.toString('base64');
 
     const forwardedRequest : ForwardedRequestMessage = {
@@ -41,7 +46,8 @@ const handleRequest = async function(request : Request, response : Response) {
         url : request.originalUrl,
         method : request.method,
         headers,
-        body
+        body,
+        responseMode: shouldStream ? 'stream' : 'buffer'
     }
 
     const requestLogContext = {
@@ -54,22 +60,99 @@ const handleRequest = async function(request : Request, response : Response) {
 
     connection.websocket.sendMessage(forwardedRequest);
 
-    // In theory, node will clean up this handler when there are no more references to it
-    // If it doesn't find a way to destroy it manually after setTimeout()
+    let listenerRemoved = false;
+    let streamingCompleted = false;
+    let streamingHeaders: Record<string, any> | undefined;
+    let streamingStatusCode: number | undefined;
+
+    const removeForwardedResponseHandler = () => {
+        if (listenerRemoved) {
+            return;
+        }
+
+        connection.websocket.removeListener('message', forwardedResponseHandler);
+        listenerRemoved = true;
+    };
+
+    const persistRequestLog = (statusCode: number, responseHeaders: Record<string, any>, responseBody: string) => {
+        createRequestLog({
+            hostname: requestLogContext.hostname,
+            method: requestLogContext.method,
+            path: requestLogContext.path,
+            requestHeaders: requestLogContext.requestHeaders,
+            requestBody: requestLogContext.requestBody,
+            responseStatus: statusCode,
+            responseHeaders,
+            responseBody
+        }).catch((error) => {
+            console.error('Failed to persist request log:', error);
+        });
+
+        pruneRequestLogsOlderThanDays(14).catch((error) => {
+            console.error('Failed to prune old request logs:', error);
+        });
+    };
+
     const forwardedResponseHandler = (text: string) => {
         try {
-            const forwardedResponseMessage : ForwardedResponseMessage = JSON.parse(text);
-            logResponse(forwardedResponseMessage, hostname); // Log if debug logging is enabled
-            const body = Buffer.from(forwardedResponseMessage.body, 'base64');
-            forwardedResponseMessage.headers['x-forwarded-for'] = connection.websocket.ipAddress;
-            const sanitizedHeaders = sanitizeForwardedResponseHeaders(forwardedResponseMessage.headers, body.length);
+            const parsedMessage = JSON.parse(text);
 
-            // Bail if this handler is not for the request that created it
-            if (forwardedResponseMessage.requestId !== requestId) {
+            if (parsedMessage.requestId !== requestId) {
                 return;
             }
 
-            if (forwardedResponseMessage.type === 'forwardedResponse') {
+            if (shouldStream) {
+                if (parsedMessage.type === 'forwardedResponseStreamStart') {
+                    const startMessage: ForwardedResponseStreamStartMessage = parsedMessage;
+                    const startHeaders = startMessage.headers || {};
+                    startHeaders['x-forwarded-for'] = connection.websocket.ipAddress;
+                    const sanitizedHeaders = sanitizeForwardedResponseHeaders(startHeaders);
+                    streamingHeaders = sanitizedHeaders;
+                    streamingStatusCode = startMessage.statusCode;
+
+                    response.status(startMessage.statusCode);
+                    for (const name in sanitizedHeaders) {
+                        const value = sanitizedHeaders[name];
+                        response.header(capitalize.words(name), value);
+                    }
+
+                    if (typeof response.flushHeaders === 'function') {
+                        response.flushHeaders();
+                    }
+
+                    return;
+                }
+
+                if (parsedMessage.type === 'forwardedResponseStreamChunk') {
+                    const chunkMessage: ForwardedResponseStreamChunkMessage = parsedMessage;
+                    const chunk = Buffer.from(chunkMessage.body || '', 'base64');
+
+                    if (chunk.length > 0) {
+                        response.write(chunk);
+                    }
+
+                    if (chunkMessage.isFinal) {
+                        streamingCompleted = true;
+                        response.end();
+                        removeForwardedResponseHandler();
+                        persistRequestLog(
+                            streamingStatusCode || 200,
+                            streamingHeaders || {},
+                            STREAMED_RESPONSE_BODY_PLACEHOLDER
+                        );
+                    }
+
+                    return;
+                }
+            }
+
+            if (parsedMessage.type === 'forwardedResponse') {
+                const forwardedResponseMessage : ForwardedResponseMessage = parsedMessage;
+                logResponse(forwardedResponseMessage, hostname); // Log if debug logging is enabled
+                forwardedResponseMessage.headers['x-forwarded-for'] = connection.websocket.ipAddress;
+                const responseBody = Buffer.from(forwardedResponseMessage.body, 'base64');
+                const sanitizedHeaders = sanitizeForwardedResponseHeaders(forwardedResponseMessage.headers, responseBody.length);
+
                 response.status(forwardedResponseMessage.statusCode);
 
                 for (const name in sanitizedHeaders) {
@@ -77,50 +160,59 @@ const handleRequest = async function(request : Request, response : Response) {
                     response.header(capitalize.words(name), value);
                 }
 
-                response.send(body);
+                response.send(responseBody);
 
-                createRequestLog({
-                    hostname: requestLogContext.hostname,
-                    method: requestLogContext.method,
-                    path: requestLogContext.path,
-                    requestHeaders: requestLogContext.requestHeaders,
-                    requestBody: requestLogContext.requestBody,
-                    responseStatus: forwardedResponseMessage.statusCode,
-                    responseHeaders: sanitizedHeaders,
-                    responseBody: forwardedResponseMessage.body
-                }).catch((error) => {
-                    console.error('Failed to persist request log:', error);
-                });
+                persistRequestLog(
+                    forwardedResponseMessage.statusCode,
+                    sanitizedHeaders,
+                    forwardedResponseMessage.body
+                );
 
-                pruneRequestLogsOlderThanDays(14).catch((error) => {
-                    console.error('Failed to prune old request logs:', error);
-                });
+                removeForwardedResponseHandler();
             }
-
-            // Now that this listener has served its purpose, remove it
-            connection.websocket.removeListener('message', forwardedResponseHandler);
         } catch (error) {
             // Log errors and remove listener
             console.error("Caught error in forwardedResponseHandler for request id " + requestId + ":" + error.message);
             console.error(error);
-            connection.websocket.removeListener('message', forwardedResponseHandler);
+            removeForwardedResponseHandler();
         }
-
-
     }
 
     // Set a new message listener on the clients websocket connection to handle the response
     connection.websocket.on('message', forwardedResponseHandler);
 
-    // Remove the listener automatically after 10 minutes, if its not already gone
-    setTimeout(() => {
-        connection.websocket.removeListener('message', forwardedResponseHandler);
-    }, tenMinutesInMilliseconds);
+    if (!shouldStream) {
+        // Remove the listener automatically after 10 minutes, if its not already gone
+        setTimeout(() => {
+            removeForwardedResponseHandler();
+        }, tenMinutesInMilliseconds);
+    }
+
+    if (shouldStream) {
+        response.on('close', () => {
+            if (streamingCompleted) {
+                return;
+            }
+
+            const cancelMessage: CancelForwardedRequestMessage = {
+                type: 'cancelForwardedRequest',
+                requestId
+            };
+
+            try {
+                connection.websocket.sendMessage(cancelMessage);
+            } catch (error) {
+                console.error('Failed to send cancelForwardedRequest message:', error);
+            } finally {
+                removeForwardedResponseHandler();
+            }
+        });
+    }
 
     return;
 }
 
-const sanitizeForwardedResponseHeaders = (headers: Record<string, any>, bodyLength: number): Record<string, any> => {
+const sanitizeForwardedResponseHeaders = (headers: Record<string, any>, bodyLength?: number): Record<string, any> => {
     const sanitized: Record<string, any> = {};
     const forbiddenHeaders = ['transfer-encoding', 'content-length'];
 
@@ -143,9 +235,25 @@ const sanitizeForwardedResponseHeaders = (headers: Record<string, any>, bodyLeng
         }
     }
 
-    sanitized['content-length'] = bodyLength.toString();
+    if (typeof bodyLength === 'number') {
+        sanitized['content-length'] = bodyLength.toString();
+    }
 
     return sanitized;
+}
+
+const shouldStreamResponse = (request: Request): boolean => {
+    const acceptHeader = request.headers['accept'];
+
+    if (!acceptHeader) {
+        return false;
+    }
+
+    const values = Array.isArray(acceptHeader) ? acceptHeader : [acceptHeader];
+
+    return values
+        .filter((value): value is string => typeof value === 'string')
+        .some((value) => value.toLowerCase().includes('text/event-stream'));
 }
 
 export default handleRequest;

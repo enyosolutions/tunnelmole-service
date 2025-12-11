@@ -73,6 +73,9 @@ NOTE: The `https` URL won't work without extra setup, see below.
 - If there is no output, double check that the tunnelmole service has been started and if it has been, check for errors
 - If you hit the URL in the output and nothing happen, double check the web server you started earlier with `serve` is running
 
+#### Server-Sent Events (SSE)
+The service and client now understand streaming responses. When an incoming request includes an `Accept: text/event-stream` header, the service keeps the HTTP connection open and streams chunks as they arrive from the tunnelmole client. That means SSE-based dashboards work the same way they would on your local network. Make sure you rebuild both the service and the client so that the matching streaming protocol is available on both sides.
+
 
 #### Security
 The service is wide open for anyone wishing to generate random URLs, so keep this in mind.

@@ -6,4 +6,5 @@ export default interface ForwardedRequestMessage
     method: string,
     headers: any,
     body: string, // Will always be base64 encoded from a Buffer
+    responseMode?: 'buffer' | 'stream'
 }
